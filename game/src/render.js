@@ -321,6 +321,14 @@ function drawPlayer(ctx, state, t) {
     ctx.arc(p.x, p.y - 2, 34 + Math.sin(t * 4) * 2, 0, Math.PI * 2);
     ctx.stroke();
   }
+  // Sheltered combo ring: the flame is safe inside a lit lantern's light.
+  if (state.comboSheltered && state.combo >= 2) {
+    ctx.strokeStyle = 'rgba(255,217,77,0.8)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y - 2, 30 + Math.sin(t * 4) * 1.5, 0, Math.PI * 2);
+    ctx.stroke();
+  }
   // Cloak.
   ctx.fillStyle = PALETTE.cloak;
   ctx.beginPath();
@@ -443,9 +451,9 @@ function drawHud(ctx, state) {
     ctx.font = 'bold 20px Georgia, serif';
     ctx.fillText(`STREAK x${state.streak}`, 660, 48);
   }
-  // Combo.
+  // Combo: gold while the flame is sheltered in a lit lantern's light.
   if (state.combo >= 2) {
-    ctx.fillStyle = '#ffb347';
+    ctx.fillStyle = state.comboSheltered ? '#ffd94d' : '#ffb347';
     ctx.font = 'bold 20px Georgia, serif';
     ctx.fillText(`COMBO x${state.combo}`, state.streak >= 2 ? 800 : 672, 48);
   }

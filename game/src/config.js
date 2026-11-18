@@ -29,6 +29,10 @@ export const EMBER = { radius: 11, maxOnField: 7, spawnEvery: 1.8, score: 25, li
 export const LANTERN_SCORE = 250;
 export const COMBO_STEP = 0.25; // +25% score per combo step, capped below
 export const COMBO_MAX = 3;
+export const COMBO_WINDOW = 6; // seconds between pickups before the combo dies
+// Sheltered combo: the dark eats your flame, so the combo timer only ticks
+// down while the keeper stands in darkness. Inside a lit lantern's pool of
+// light the flame is sheltered and the combo holds.
 export const STREAK_BONUS = 50; // +points per lantern lit without taking a hit
 
 // A golden ember is rare, bright and worth far more than a normal one.

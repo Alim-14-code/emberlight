@@ -8,11 +8,13 @@
 // boots, an aegis that blocks one hit), a rare golden ember worth far more,
 // a fourth wisp kind (the weaving wraith), and a streak bonus for lighting
 // lanterns without taking a hit. The grove itself is darker now, and every
-// light — lantern, ember, keeper — pushes the dark back.
+// light — lantern, ember, keeper — pushes the dark back. And the dark eats
+// your flame: a combo only fades while you stand in darkness, so the light
+// you have already won shelters the streak you are building.
 import {
   VIEW, PLAYER, LANTERNS, LANTERN_COUNT, EMBERS_PER_LANTERN, EMBER,
-  LANTERN_SCORE, COMBO_STEP, COMBO_MAX, WISP, GAME, GOLDEN_EMBER, POWERUP,
-  STREAK_BONUS,
+  LANTERN_SCORE, COMBO_STEP, COMBO_MAX, COMBO_WINDOW, LANTERN_LIGHT_RADIUS,
+  WISP, GAME, GOLDEN_EMBER, POWERUP, STREAK_BONUS,
 } from './config.js';
 import { makeRandom } from './random.js';
 
@@ -93,6 +95,7 @@ export function createWorld(seed = 20261117) {
       carried: 0,
       combo: 0,
       comboTimer: 0,
+      comboSheltered: false, // keeper stands in a lit lantern's light
       streak: 0, // lanterns lit since the last hit
       shake: 0,
       emberTimer: 0,
@@ -241,7 +244,19 @@ export function createWorld(seed = 20261117) {
       state.loseReason = 'Night fell before the lanterns were lit.';
       return EVENT_LOSE;
     }
-    if (state.comboTimer > 0) {
+    // The dark eats your flame: the combo timer only ticks down while the
+    // keeper stands in darkness. Inside a lit lantern's pool of light the
+    // flame is sheltered and the combo holds, so routing through light you
+    // have already won keeps a streak alive.
+    let sheltered = false;
+    for (const lantern of state.lanterns) {
+      if (!lantern.lit) continue;
+      const sdx = state.player.x - lantern.x;
+      const sdy = state.player.y - lantern.y;
+      if (sdx * sdx + sdy * sdy < LANTERN_LIGHT_RADIUS * LANTERN_LIGHT_RADIUS) { sheltered = true; break; }
+    }
+    state.comboSheltered = sheltered;
+    if (state.comboTimer > 0 && !sheltered) {
       state.comboTimer -= dt;
       if (state.comboTimer <= 0) state.combo = 0;
     }
@@ -292,7 +307,7 @@ export function createWorld(seed = 20261117) {
         state.embers.splice(i, 1);
         state.carried += 1;
         state.combo += 1;
-        state.comboTimer = 6;
+        state.comboTimer = COMBO_WINDOW;
         if (e.golden) {
           state.combo += GOLDEN_EMBER.comboBonus;
           state.score += GOLDEN_EMBER.score;
