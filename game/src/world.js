@@ -72,11 +72,14 @@ export function createWorld(seed = 20261117) {
       lunging: 0,
       phase: rng.range(0, Math.PI * 2),
       weave: rng.range(0, Math.PI * 2),
+      chaseTime: 0,
+      restTimer: 0,
+      restAngle: 0,
     };
   }
 
   function wispTargetCount() {
-    return Math.min(2 + state.litCount, 8);
+    return Math.min(2 + Math.floor(state.litCount / 2), 6);
   }
 
   function reset() {
@@ -144,7 +147,7 @@ export function createWorld(seed = 20261117) {
   }
 
   function difficulty() {
-    return 1 + state.litCount * 0.09;
+    return 1 + state.litCount * 0.06;
   }
 
   function depositAt(lantern) {
@@ -172,6 +175,7 @@ export function createWorld(seed = 20261117) {
   }
 
   function takeHit(wisp) {
+    wisp.chaseTime = 0;
     // The aegis absorbs one hit instead of a heart.
     if (state.aegisTime > 0) {
       state.aegisTime = 0;
@@ -361,6 +365,23 @@ export function createWorld(seed = 20261117) {
       const dx = p.x - w.x;
       const dy = p.y - w.y;
       const d = Math.hypot(dx, dy) || 1;
+      // The shadows lose the scent: a wisp that chases for a long while
+      // without landing a hit grows weary and drifts off for a few seconds.
+      // This breaks stalemates where a wisp camps the keeper's path and the
+      // keeper can only dodge forever instead of gathering embers.
+      if (w.restTimer > 0) {
+        w.restTimer -= dt;
+        w.x += Math.cos(w.restAngle) * 46 * dt;
+        w.y += Math.sin(w.restAngle) * 46 * dt;
+        continue;
+      }
+      w.chaseTime += dt;
+      if (w.chaseTime > 7) {
+        w.chaseTime = 0;
+        w.restTimer = 2.6;
+        w.restAngle = rng.range(0, Math.PI * 2);
+        continue;
+      }
       let speedW = WISP.drifterSpeed * diff;
       if (w.kind === WISP_DART) {
         speedW = WISP.dartSpeed * diff;
@@ -381,8 +402,27 @@ export function createWorld(seed = 20261117) {
       }
       // Wisps wobble so their path is readable, not a perfect homing line.
       const wob = Math.sin(w.phase) * 0.35 + (w.kind === WISP_WRAITH ? Math.sin(w.weave) * 0.55 : 0);
-      const nx = dx / d;
-      const ny = dy / d;
+      let nx = dx / d;
+      let ny = dy / d;
+      // Lit lanterns push the dark back: a wisp inside a lantern's pool of
+      // light is shoved outward and slowed, so the grove you have already
+      // lit becomes safer ground to stand on. This keeps a wisp from camping
+      // the path to a lantern and stalling the keeper forever.
+      for (const lantern of state.lanterns) {
+        if (!lantern.lit) continue;
+        const lx = w.x - lantern.x;
+        const ly = w.y - lantern.y;
+        const ld = Math.hypot(lx, ly) || 1;
+        if (ld < 190) {
+          const push = (190 - ld) / 190;
+          nx += (lx / ld) * push * 1.4;
+          ny += (ly / ld) * push * 1.4;
+          speedW *= 1 - push * 0.45;
+        }
+      }
+      const nl = Math.hypot(nx, ny) || 1;
+      nx /= nl;
+      ny /= nl;
       w.x += (nx - ny * wob) * speedW * dt;
       w.y += (ny + nx * wob) * speedW * dt;
       if (p.invulnerable <= 0 && d < PLAYER.radius + w.radius - 2) {

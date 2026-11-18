@@ -4,11 +4,11 @@ export const VIEW = { width: 1280, height: 720 };
 
 export const PLAYER = {
   radius: 18,
-  speed: 265,
+  speed: 285,
   dashSpeed: 640,
   dashTime: 0.16,
-  dashCooldown: 1.1,
-  invulnerableTime: 1.1,
+  dashCooldown: 0.9,
+  invulnerableTime: 1.6,
   carryMax: 3,
   lightRadius: 150, // the keeper's own lantern light in the dark
 };
@@ -25,7 +25,7 @@ export const LANTERN_COUNT = LANTERNS.length;
 export const EMBERS_PER_LANTERN = 3;
 export const LANTERN_LIGHT_RADIUS = 190; // pool of light a lit lantern casts
 
-export const EMBER = { radius: 11, maxOnField: 5, spawnEvery: 2.4, score: 25, lightRadius: 70 };
+export const EMBER = { radius: 11, maxOnField: 7, spawnEvery: 1.8, score: 25, lightRadius: 70 };
 export const LANTERN_SCORE = 250;
 export const COMBO_STEP = 0.25; // +25% score per combo step, capped below
 export const COMBO_MAX = 3;
@@ -39,14 +39,14 @@ export const GOLDEN_EMBER = {
 
 export const WISP = {
   radius: 17,
-  drifterSpeed: 95,
-  dartSpeed: 150,
-  dartLungeSpeed: 330,
-  bruteSpeed: 70,
+  drifterSpeed: 88,
+  dartSpeed: 140,
+  dartLungeSpeed: 300,
+  bruteSpeed: 64,
   bruteRadius: 26,
-  wraithSpeed: 185, // weaves in a sine wave; appears once 3 lanterns burn
+  wraithSpeed: 168, // weaves in a sine wave; appears once 3 lanterns burn
   wraithRadius: 15,
-  spawnEvery: 3.2,
+  spawnEvery: 4.2,
 };
 
 // Power-ups: one at a time on the field, a new one every few seconds.
@@ -60,8 +60,8 @@ export const POWERUP = {
 };
 
 export const GAME = {
-  hearts: 3,
-  timeLimit: 180, // seconds of night left; reaching zero loses the game
+  hearts: 4,
+  timeLimit: 195, // seconds of night left; reaching zero loses the game
   step: 1 / 60,
   winBonusPerSecondLeft: 5,
 };
