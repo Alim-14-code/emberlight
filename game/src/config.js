@@ -10,6 +10,7 @@ export const PLAYER = {
   dashCooldown: 1.1,
   invulnerableTime: 1.1,
   carryMax: 3,
+  lightRadius: 150, // the keeper's own lantern light in the dark
 };
 
 export const LANTERNS = [
@@ -22,11 +23,19 @@ export const LANTERNS = [
 ];
 export const LANTERN_COUNT = LANTERNS.length;
 export const EMBERS_PER_LANTERN = 3;
+export const LANTERN_LIGHT_RADIUS = 190; // pool of light a lit lantern casts
 
-export const EMBER = { radius: 11, maxOnField: 5, spawnEvery: 2.4, score: 25 };
+export const EMBER = { radius: 11, maxOnField: 5, spawnEvery: 2.4, score: 25, lightRadius: 70 };
 export const LANTERN_SCORE = 250;
 export const COMBO_STEP = 0.25; // +25% score per combo step, capped below
 export const COMBO_MAX = 3;
+export const STREAK_BONUS = 50; // +points per lantern lit without taking a hit
+
+// A golden ember is rare, bright and worth far more than a normal one.
+export const GOLDEN_EMBER = {
+  radius: 14, score: 150, comboBonus: 2, lightRadius: 110,
+  spawnEvery: 26, chance: 0.45,
+};
 
 export const WISP = {
   radius: 17,
@@ -35,7 +44,19 @@ export const WISP = {
   dartLungeSpeed: 330,
   bruteSpeed: 70,
   bruteRadius: 26,
+  wraithSpeed: 185, // weaves in a sine wave; appears once 3 lanterns burn
+  wraithRadius: 15,
   spawnEvery: 3.2,
+};
+
+// Power-ups: one at a time on the field, a new one every few seconds.
+export const POWERUP = {
+  spawnEvery: 13,
+  maxOnField: 1,
+  magnetRadius: 280, magnetTime: 9,
+  swiftMult: 1.45, swiftTime: 8,
+  aegisTime: 20, // shield blocks one hit, then fades
+  types: ['magnet', 'swift', 'aegis'],
 };
 
 export const GAME = {
@@ -45,19 +66,30 @@ export const GAME = {
   winBonusPerSecondLeft: 5,
 };
 
+// How dark the grove is away from any light (0 = noon, 1 = pitch black).
+export const DARKNESS = 0.58;
+
 export const PALETTE = {
-  skyTop: '#0a1a2e',
-  skyBottom: '#123240',
-  ground: '#0d2b26',
+  skyTop: '#060f1e',
+  skyBottom: '#0d2733',
+  ground: '#0a231f',
   ember: '#ffb347',
   emberCore: '#ffe9a8',
+  golden: '#ffd94d',
+  goldenCore: '#fff6c8',
   lanternLit: '#ffd166',
   lanternDark: '#3a4a5a',
   wisp: '#8b7ff0',
   wispBrute: '#c65df0',
+  wispWraith: '#5fe3c8',
   player: '#f4ead8',
   cloak: '#2e6f6a',
   heart: '#ff5d73',
   text: '#f7f3e8',
   dim: '#9db8c4',
+  mushroom: '#7fe0a8',
+  mushroomCap: '#ff8fa3',
+  powerMagnet: '#7fd4ff',
+  powerSwift: '#a8ff7f',
+  powerAegis: '#c9a8ff',
 };

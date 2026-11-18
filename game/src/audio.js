@@ -84,6 +84,17 @@ export function createAudio() {
     tick() {
       tone(880, 0.06, 'square', 0.06);
     },
+    powerup() {
+      [440, 554, 659, 880].forEach((f, i) => tone(f, 0.16, 'sine', 0.18, i * 0.05));
+    },
+    golden() {
+      [784, 988, 1175, 1568].forEach((f, i) => tone(f, 0.2, 'triangle', 0.2, i * 0.06));
+      tone(2093, 0.3, 'sine', 0.12, 0.24);
+    },
+    shield() {
+      tone(520, 0.25, 'triangle', 0.2, 0, 780);
+      tone(780, 0.2, 'sine', 0.12, 0.08);
+    },
     win() {
       [523, 659, 784, 1047, 1319].forEach((f, i) => tone(f, 0.4, 'triangle', 0.2, i * 0.11));
       tone(262, 1.2, 'sine', 0.12, 0.1);

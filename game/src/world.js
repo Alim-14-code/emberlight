@@ -3,9 +3,16 @@
 // Shadow wisps hunt the keeper: one touch costs a heart and scatters the
 // embers being carried. Light all six lanterns to win; lose all hearts or
 // let the timer reach zero to lose.
+//
+// Depth beyond the first version: power-ups (a magnet that pulls embers, swift
+// boots, an aegis that blocks one hit), a rare golden ember worth far more,
+// a fourth wisp kind (the weaving wraith), and a streak bonus for lighting
+// lanterns without taking a hit. The grove itself is darker now, and every
+// light — lantern, ember, keeper — pushes the dark back.
 import {
   VIEW, PLAYER, LANTERNS, LANTERN_COUNT, EMBERS_PER_LANTERN, EMBER,
-  LANTERN_SCORE, COMBO_STEP, COMBO_MAX, WISP, GAME,
+  LANTERN_SCORE, COMBO_STEP, COMBO_MAX, WISP, GAME, GOLDEN_EMBER, POWERUP,
+  STREAK_BONUS,
 } from './config.js';
 import { makeRandom } from './random.js';
 
@@ -17,21 +24,36 @@ export const EVENT_WIN = 8;
 export const EVENT_LOSE = 16;
 export const EVENT_DASH = 32;
 export const EVENT_WISP = 64;
+export const EVENT_POWERUP = 256;
+export const EVENT_GOLDEN = 512;
+export const EVENT_SHIELD = 1024;
 
 export const WISP_DRIFTER = 'drifter';
 export const WISP_DART = 'dart';
 export const WISP_BRUTE = 'brute';
+export const WISP_WRAITH = 'wraith';
 
 export function createWorld(seed = 20261117) {
   const rng = makeRandom(seed);
   let state = null;
 
-  function spawnEmber() {
+  function spawnEmber(golden = false) {
     return {
       x: rng.range(70, VIEW.width - 70),
       y: rng.range(90, VIEW.height - 70),
       phase: rng.range(0, Math.PI * 2),
       bob: rng.range(0.8, 1.4),
+      golden,
+    };
+  }
+
+  function spawnPowerup() {
+    const type = POWERUP.types[Math.floor(rng.next() * POWERUP.types.length)];
+    return {
+      type,
+      x: rng.range(90, VIEW.width - 90),
+      y: rng.range(110, VIEW.height - 90),
+      phase: rng.range(0, Math.PI * 2),
     };
   }
 
@@ -45,10 +67,11 @@ export function createWorld(seed = 20261117) {
     if (edge === 3) { x = -30; y = rng.range(0, VIEW.height); }
     return {
       kind, x, y, vx: 0, vy: 0,
-      radius: kind === WISP_BRUTE ? WISP.bruteRadius : WISP.radius,
+      radius: kind === WISP_BRUTE ? WISP.bruteRadius : kind === WISP_WRAITH ? WISP.wraithRadius : WISP.radius,
       lungeTimer: rng.range(1.2, 2.4),
       lunging: 0,
       phase: rng.range(0, Math.PI * 2),
+      weave: rng.range(0, Math.PI * 2),
     };
   }
 
@@ -67,26 +90,55 @@ export function createWorld(seed = 20261117) {
       carried: 0,
       combo: 0,
       comboTimer: 0,
+      streak: 0, // lanterns lit since the last hit
       shake: 0,
       emberTimer: 0,
+      goldenTimer: GOLDEN_EMBER.spawnEvery * 0.6,
+      powerupTimer: POWERUP.spawnEvery * 0.7,
       wispTimer: 2,
       over: false,
       won: false,
       loseReason: '',
       lastTickSecond: -1,
+      magnetTime: 0,
+      swiftTime: 0,
+      aegisTime: 0,
       player: {
         x: VIEW.width / 2, y: VIEW.height / 2, vx: 0, vy: 0,
         dashTime: 0, dashCooldown: 0, invulnerable: 0, facing: 1,
       },
       lanterns: LANTERNS.map((p) => ({ x: p.x, y: p.y, lit: false, progress: 0, glow: 0 })),
       embers: [spawnEmber(), spawnEmber(), spawnEmber()],
+      powerups: [],
       wisps: [spawnWisp(WISP_DRIFTER), spawnWisp(WISP_DRIFTER)],
       stars: [],
+      mushrooms: [],
+      fireflies: [],
+      stones: [],
     };
-    for (let i = 0; i < 90; i += 1) {
+    for (let i = 0; i < 110; i += 1) {
       state.stars.push({
         x: rng.range(0, VIEW.width), y: rng.range(0, VIEW.height * 0.62),
         r: rng.range(0.6, 2.1), tw: rng.range(0, Math.PI * 2),
+      });
+    }
+    // Decorative grove life, fixed by the seed so screenshots are stable.
+    for (let i = 0; i < 16; i += 1) {
+      state.mushrooms.push({
+        x: rng.range(40, VIEW.width - 40), y: rng.range(330, VIEW.height - 30),
+        s: rng.range(0.7, 1.5), phase: rng.range(0, Math.PI * 2),
+      });
+    }
+    for (let i = 0; i < 26; i += 1) {
+      state.fireflies.push({
+        x: rng.range(0, VIEW.width), y: rng.range(320, VIEW.height - 20),
+        phase: rng.range(0, Math.PI * 2), speed: rng.range(0.3, 0.8),
+      });
+    }
+    for (let i = 0; i < 22; i += 1) {
+      state.stones.push({
+        x: rng.range(30, VIEW.width - 30), y: rng.range(320, VIEW.height - 20),
+        rx: rng.range(14, 42), ry: rng.range(5, 10),
       });
     }
   }
@@ -103,8 +155,10 @@ export function createWorld(seed = 20261117) {
       lantern.lit = true;
       lantern.progress = EMBERS_PER_LANTERN;
       state.litCount += 1;
+      state.streak += 1;
       const mult = 1 + Math.min(state.combo, 8) * COMBO_STEP;
-      const points = Math.round(LANTERN_SCORE * Math.min(mult, COMBO_MAX));
+      let points = Math.round(LANTERN_SCORE * Math.min(mult, COMBO_MAX));
+      if (state.streak >= 2) points += STREAK_BONUS * (state.streak - 1);
       state.score += points;
       if (state.litCount >= LANTERN_COUNT) {
         state.won = true;
@@ -118,9 +172,18 @@ export function createWorld(seed = 20261117) {
   }
 
   function takeHit(wisp) {
+    // The aegis absorbs one hit instead of a heart.
+    if (state.aegisTime > 0) {
+      state.aegisTime = 0;
+      const p = state.player;
+      p.invulnerable = PLAYER.invulnerableTime;
+      state.shake = 0.3;
+      return EVENT_SHIELD;
+    }
     state.hearts -= 1;
     state.combo = 0;
     state.comboTimer = 0;
+    state.streak = 0;
     state.shake = 0.45;
     const p = state.player;
     p.invulnerable = PLAYER.invulnerableTime;
@@ -136,7 +199,7 @@ export function createWorld(seed = 20261117) {
       state.embers.push({
         x: Math.max(50, Math.min(VIEW.width - 50, p.x + (dx / d) * 60 + rng.range(-30, 30))),
         y: Math.max(60, Math.min(VIEW.height - 50, p.y + (dy / d) * 60 + rng.range(-30, 30))),
-        phase: rng.range(0, Math.PI * 2), bob: 1,
+        phase: rng.range(0, Math.PI * 2), bob: 1, golden: false,
       });
     }
     if (state.hearts <= 0) {
@@ -146,6 +209,12 @@ export function createWorld(seed = 20261117) {
       return EVENT_HIT | EVENT_LOSE;
     }
     return EVENT_HIT;
+  }
+
+  function applyPowerup(type) {
+    if (type === 'magnet') state.magnetTime = POWERUP.magnetTime;
+    if (type === 'swift') state.swiftTime = POWERUP.swiftTime;
+    if (type === 'aegis') state.aegisTime = POWERUP.aegisTime;
   }
 
   // Step the world by dt seconds. moveX/moveY are -1..1, dash is a fresh
@@ -172,6 +241,9 @@ export function createWorld(seed = 20261117) {
       state.comboTimer -= dt;
       if (state.comboTimer <= 0) state.combo = 0;
     }
+    if (state.magnetTime > 0) state.magnetTime -= dt;
+    if (state.swiftTime > 0) state.swiftTime -= dt;
+    if (state.aegisTime > 0) state.aegisTime -= dt;
 
     const p = state.player;
     if (p.invulnerable > 0) p.invulnerable -= dt;
@@ -182,6 +254,7 @@ export function createWorld(seed = 20261117) {
       events |= EVENT_DASH;
     }
     let speed = PLAYER.speed;
+    if (state.swiftTime > 0) speed *= POWERUP.swiftMult;
     if (p.dashTime > 0) {
       p.dashTime -= dt;
       speed = PLAYER.dashSpeed;
@@ -193,6 +266,19 @@ export function createWorld(seed = 20261117) {
     p.x = Math.max(PLAYER.radius, Math.min(VIEW.width - PLAYER.radius, p.x + p.vx * dt));
     p.y = Math.max(PLAYER.radius + 24, Math.min(VIEW.height - PLAYER.radius, p.y + p.vy * dt));
 
+    // Magnet: embers drift toward the keeper while it lasts.
+    if (state.magnetTime > 0) {
+      for (const e of state.embers) {
+        const dx = p.x - e.x;
+        const dy = p.y - e.y;
+        const d = Math.hypot(dx, dy) || 1;
+        if (d < POWERUP.magnetRadius && d > 24) {
+          e.x += (dx / d) * 260 * dt;
+          e.y += (dy / d) * 260 * dt;
+        }
+      }
+    }
+
     // Ember pickups.
     for (let i = state.embers.length - 1; i >= 0; i -= 1) {
       const e = state.embers[i];
@@ -203,15 +289,46 @@ export function createWorld(seed = 20261117) {
         state.carried += 1;
         state.combo += 1;
         state.comboTimer = 6;
-        const mult = 1 + Math.min(state.combo - 1, 8) * COMBO_STEP;
-        state.score += Math.round(EMBER.score * Math.min(mult, COMBO_MAX));
-        events |= EVENT_PICKUP;
+        if (e.golden) {
+          state.combo += GOLDEN_EMBER.comboBonus;
+          state.score += GOLDEN_EMBER.score;
+          events |= EVENT_GOLDEN;
+        } else {
+          const mult = 1 + Math.min(state.combo - 1, 8) * COMBO_STEP;
+          state.score += Math.round(EMBER.score * Math.min(mult, COMBO_MAX));
+          events |= EVENT_PICKUP;
+        }
       }
     }
     state.emberTimer += dt;
     if (state.emberTimer >= EMBER.spawnEvery && state.embers.length < EMBER.maxOnField) {
       state.emberTimer = 0;
       state.embers.push(spawnEmber());
+    }
+    // The golden ember is rare: sometimes a fresh spawn is golden instead.
+    state.goldenTimer += dt;
+    if (state.goldenTimer >= GOLDEN_EMBER.spawnEvery) {
+      state.goldenTimer = 0;
+      if (rng.next() < GOLDEN_EMBER.chance && !state.embers.some((e) => e.golden)) {
+        state.embers.push(spawnEmber(true));
+      }
+    }
+
+    // Power-ups: one on the field at a time.
+    state.powerupTimer += dt;
+    if (state.powerupTimer >= POWERUP.spawnEvery && state.powerups.length < POWERUP.maxOnField) {
+      state.powerupTimer = 0;
+      state.powerups.push(spawnPowerup());
+    }
+    for (let i = state.powerups.length - 1; i >= 0; i -= 1) {
+      const u = state.powerups[i];
+      u.phase += dt * 2;
+      const d = Math.hypot(p.x - u.x, p.y - u.y);
+      if (d < PLAYER.radius + 22) {
+        state.powerups.splice(i, 1);
+        applyPowerup(u.type);
+        events |= EVENT_POWERUP;
+      }
     }
 
     // Lantern deposits: touch a dark lantern while carrying embers.
@@ -231,9 +348,10 @@ export function createWorld(seed = 20261117) {
     if (state.wispTimer >= WISP.spawnEvery && state.wisps.length < wispTargetCount()) {
       state.wispTimer = 0;
       const roll = rng.next();
-      const kind = state.litCount >= 4 && roll < 0.25
-        ? WISP_BRUTE
-        : state.litCount >= 2 && roll < 0.55 ? WISP_DART : WISP_DRIFTER;
+      let kind = WISP_DRIFTER;
+      if (state.litCount >= 4 && roll < 0.25) kind = WISP_BRUTE;
+      else if (state.litCount >= 3 && roll < 0.5) kind = WISP_WRAITH;
+      else if (state.litCount >= 2 && roll < 0.55) kind = WISP_DART;
       state.wisps.push(spawnWisp(kind));
       events |= EVENT_WISP;
     }
@@ -256,14 +374,20 @@ export function createWorld(seed = 20261117) {
         }
       }
       if (w.kind === WISP_BRUTE) speedW = WISP.bruteSpeed * diff;
+      if (w.kind === WISP_WRAITH) {
+        // Weaves side to side as it closes in, so its path is a wave.
+        w.weave += dt * 5;
+        speedW = WISP.wraithSpeed * diff;
+      }
       // Wisps wobble so their path is readable, not a perfect homing line.
-      const wob = Math.sin(w.phase) * 0.35;
+      const wob = Math.sin(w.phase) * 0.35 + (w.kind === WISP_WRAITH ? Math.sin(w.weave) * 0.55 : 0);
       const nx = dx / d;
       const ny = dy / d;
       w.x += (nx - ny * wob) * speedW * dt;
       w.y += (ny + nx * wob) * speedW * dt;
       if (p.invulnerable <= 0 && d < PLAYER.radius + w.radius - 2) {
-        events |= takeHit(w);
+        const hitEvents = takeHit(w);
+        events |= hitEvents;
         if (state.over) return events;
       }
     }

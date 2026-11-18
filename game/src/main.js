@@ -1,7 +1,7 @@
 // Emberlight — boot, fixed-step loop, screen state machine and wiring between
 // input, world, particles, audio and the renderer.
 import { VIEW, GAME, PLAYER, EMBER, LANTERN_SCORE } from './config.js';
-import { createWorld, EVENT_PICKUP, EVENT_DEPOSIT, EVENT_HIT, EVENT_WIN, EVENT_LOSE, EVENT_DASH, EVENT_WISP, EVENT_TICK } from './world.js';
+import { createWorld, EVENT_PICKUP, EVENT_DEPOSIT, EVENT_HIT, EVENT_WIN, EVENT_LOSE, EVENT_DASH, EVENT_WISP, EVENT_TICK, EVENT_POWERUP, EVENT_GOLDEN, EVENT_SHIELD } from './world.js';
 import { drawWorld, SCREEN_TITLE, SCREEN_PLAY, SCREEN_PAUSE, SCREEN_WIN, SCREEN_OVER } from './render.js';
 import { createInput } from './input.js';
 import { createParticles } from './particles.js';
@@ -70,6 +70,21 @@ function handleEvents(events) {
   if (events & EVENT_HIT) {
     audio.hit();
     particles.burst(p.x, p.y, '#8b7ff0', 22, 220);
+  }
+  if (events & EVENT_POWERUP) {
+    audio.powerup();
+    particles.ring(p.x, p.y, '#7fd4ff');
+    particles.floatText(p.x, p.y - 34, 'POWER UP!', '#7fd4ff');
+  }
+  if (events & EVENT_GOLDEN) {
+    audio.golden();
+    particles.burst(p.x, p.y, '#ffd94d', 18, 200);
+    particles.floatText(p.x, p.y - 34, 'GOLDEN +150', '#ffd94d');
+  }
+  if (events & EVENT_SHIELD) {
+    audio.shield();
+    particles.ring(p.x, p.y, '#c9a8ff');
+    particles.floatText(p.x, p.y - 34, 'AEGIS BLOCKED!', '#c9a8ff');
   }
   if (events & EVENT_DASH) {
     audio.dash();

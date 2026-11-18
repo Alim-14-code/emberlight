@@ -52,9 +52,18 @@ function autopilot(state, suicidal) {
       dash: nearestD < 110 && p.dashCooldown <= 0,
     };
   }
+  // A power-up on the field is worth a detour when it is close.
   let target = null;
-  if (state.carried < 3) {
-    let bestD = Infinity;
+  let bestD = Infinity;
+  for (const u of state.powerups) {
+    const d = Math.hypot(p.x - u.x, p.y - u.y);
+    if (d < 240 && d < bestD) {
+      bestD = d;
+      target = u;
+    }
+  }
+  if (!target && state.carried < 3) {
+    bestD = Infinity;
     for (const e of state.embers) {
       const d = Math.hypot(p.x - e.x, p.y - e.y);
       if (d < bestD) {
@@ -98,7 +107,10 @@ export function stageShot(name, world) {
     return { screen: SCREEN_TITLE, best: 2450 };
   }
   const suicidal = name === 'lose';
-  const limit = name === 'win' ? 240 : name === 'lose' ? 120 : 30;
+  // The play shot stops the moment the game is at its richest mid-game state
+  // (3+ lanterns lit, 20s+ in): the frame must show play in progress, never
+  // an end screen. The win/lose shots run to the end instead.
+  const limit = name === 'win' ? 240 : name === 'lose' ? 120 : 80;
   let attempts = name === 'win' ? 3 : 1;
   while (attempts > 0) {
     attempts -= 1;
@@ -115,6 +127,10 @@ export function stageShot(name, world) {
         return { screen: SCREEN_OVER, best: 2450 };
       }
       if (state.over) break;
+      // Play shot: freeze the frame once the grove is half-lit.
+      if (name === 'play' && state.litCount >= 3 && state.time >= 20) {
+        return { screen: SCREEN_PLAY, best: Math.max(2450, state.score) };
+      }
     }
     if (state.won) return { screen: SCREEN_WIN, best: Math.max(2450, state.score) };
     if (name !== 'win' || state.over) break;
